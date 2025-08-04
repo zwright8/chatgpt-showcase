@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore ChatGPT</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-pVrmwtbQV7QQGFjeLv0NYY3psOy76o7qVsTrF+F9xzhVaPQC5PpSWeu3wy5FVf6xMV+5isIZEuYzLLhGAv2VDA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="overlay"></div>
+        <div class="content">
+            <h1>Discover the Power of ChatGPT</h1>
+            <p>Experience cutting‑edge AI that understands and creates like never before.</p>
+            <a href="#features" class="btn-primary">Explore Features</a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <h2>Capabilities That Inspire</h2>
+        <p class="section-subtitle">ChatGPT unlocks new possibilities across a wide range of tasks.</p>
+        <div class="cards">
+            <div class="card">
+                <div class="icon"><i class="fa-solid fa-language"></i></div>
+                <h3>Natural Language Understanding</h3>
+                <p>Comprehend and respond to complex questions with contextual awareness and nuance.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fa-solid fa-pen-nib"></i></div>
+                <h3>Creative Text Generation</h3>
+                <p>Write stories, articles, and marketing copy with fluency and a human‑like touch.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fa-solid fa-code"></i></div>
+                <h3>Programming Assistance</h3>
+                <p>Generate code, debug problems, and explain concepts in multiple languages.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fa-solid fa-graduation-cap"></i></div>
+                <h3>Learning & Education</h3>
+                <p>Teach complex topics, provide examples, and guide learners at all levels.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fa-solid fa-route"></i></div>
+                <h3>Planning & Recommendations</h3>
+                <p>Create personalized itineraries, meal plans, and suggestions based on your needs.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fa-solid fa-images"></i></div>
+                <h3>Multimodal & Visual</h3>
+                <p>Interpret images, describe visuals, and generate detailed alt‑text.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="demo">
+        <h2>Interactive Demo</h2>
+        <p class="section-subtitle">Type a message to see how ChatGPT could respond.</p>
+        <div id="chat-container" class="chat-container">
+            <div id="chat-messages" class="chat-messages">
+                <!-- Messages will appear here dynamically -->
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="user-input" placeholder="Ask me anything..." />
+                <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+        <p class="demo-note">This demo uses canned responses to illustrate a conversation. To try the real thing, connect with the OpenAI API.</p>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <h2>Contact Us</h2>
+        <p class="section-subtitle">Get in touch to integrate ChatGPT into your workflow.</p>
+        <form class="contact-form" onsubmit="event.preventDefault(); alert('Thank you! We will be in touch.');">
+            <div class="form-group">
+                <input type="text" placeholder="Your Name" required>
+            </div>
+            <div class="form-group">
+                <input type="email" placeholder="Your Email" required>
+            </div>
+            <div class="form-group">
+                <textarea rows="4" placeholder="Your Message" required></textarea>
+            </div>
+            <button type="submit" class="btn-primary">Send Message</button>
+        </form>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; <span id="year"></span> Explore ChatGPT. All rights reserved.</p>
+        <p class="footer-note">Built with ♥ to showcase the potential of AI.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
