@@ -250,6 +250,74 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
       /**
+       * Scan a broad universe of tickers and update the results table in
+       * real time as undervalued companies are discovered.  This helper
+       * performs the same logic as scanAllUndervalued() but renders the
+       * results incrementally instead of waiting for the full scan to
+       * complete.  It sorts the accumulating list of undervalued stocks by
+       * their price-to-intrinsic ratio on each update so that the most
+       * undervalued names remain at the top.  This function uses the
+       * existing renderResults() helper to display the rows.
+       *
+       * Note: Because this performs thousands of API requests when limit is
+       * zero or very large, it can take a significant amount of time and
+       * may exhaust free API limits.  Supplying your own API key via the
+       * input field is strongly recommended.
+       *
+       * @param {number} limit Maximum number of tickers to scan.  Set to
+       *   zero or a negative value to scan all available symbols.
+       */
+      async function scanAndDisplayUndervalued(limit = 0) {
+        const tickers = await fetchNasdaqList(limit);
+        const results = [];
+        // Clear any previous results and hide the table initially
+        resultsBody.innerHTML = '';
+        resultsTable.style.display = 'none';
+        for (const symbol of tickers) {
+          try {
+            const fundamental = await lookupTicker(symbol);
+            if (!fundamental) continue;
+            const price = typeof fundamental.price === 'number' && !isNaN(fundamental.price) ? fundamental.price : null;
+            const dividend = typeof fundamental.dividendPerShare === 'number' && !isNaN(fundamental.dividendPerShare) ? fundamental.dividendPerShare : null;
+            const discountRate = 0.08;
+            const intrinsicVal = dividend ? dividend / discountRate : null;
+            if (price != null && intrinsicVal != null && price < intrinsicVal) {
+              const metrics = computeMetrics(fundamental);
+              // Include numeric fields for sorting
+              results.push({
+                ticker: symbol.toUpperCase(),
+                ...metrics,
+                _priceNumeric: price,
+                _intrinsicNumeric: intrinsicVal
+              });
+              // Sort by how undervalued: price / intrinsic ascending
+              results.sort((a, b) => {
+                const ratioA = a._priceNumeric / a._intrinsicNumeric;
+                const ratioB = b._priceNumeric / b._intrinsicNumeric;
+                return ratioA - ratioB;
+              });
+              // Prepare display rows without private fields
+              const displayRows = results.map(({ ticker, price, eps, pe, bookValue, pb, evEbitda, dividendPerShare, dividendYield, intrinsicDividend }) => ({
+                ticker,
+                price,
+                eps,
+                pe,
+                bookValue,
+                pb,
+                evEbitda,
+                dividendPerShare,
+                dividendYield,
+                intrinsicDividend
+              }));
+              renderResults(displayRows);
+            }
+          } catch (err) {
+            console.warn('Error scanning symbol', symbol, err);
+          }
+        }
+      }
+
+      /**
        * Fetch a list of ticker symbols from the NASDAQ screener API. This
        * endpoint returns approximately 7,000 actively traded U.S. companies
        * along with price and market cap information.  We only need the
@@ -379,29 +447,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
       // Attach handler for the Full Market Scan button.  This triggers a
-      // comprehensive scan over a broad universe of tickers.  By default we
-      // scan every available NASDAQ ticker.  Depending on the size of the
-      // universe this may take several minutes and make many API requests, so
-      // users should supply their own API key to avoid rate limits.  The
+      // comprehensive scan over a broad universe of tickers and updates the
+      // results table incrementally as undervalued companies are found.  The
       // button is disabled while the scan runs, and its label changes to
-      // indicate progress.  Pass a limit <= 0 to scan the entire list.
+      // indicate progress.  We scan all available symbols when limit <= 0.
       if (fullScanBtn) {
         fullScanBtn.addEventListener('click', async () => {
           // Use the user‑supplied API key if provided
           if (apiKeyInput && apiKeyInput.value && apiKeyInput.value.trim()) {
             API_KEYS.alpha = apiKeyInput.value.trim();
           }
-          // Update UI to indicate scanning is in progress
           const originalText = fullScanBtn.textContent;
           fullScanBtn.textContent = 'Scanning...';
           fullScanBtn.disabled = true;
           try {
-            // Pass limit <= 0 to scan all available symbols.  Note: this can
-            // generate thousands of requests and may exceed free API limits.
-            const rows = await scanAllUndervalued(0);
-            renderResults(rows);
+            await scanAndDisplayUndervalued(0);
           } finally {
-            // Restore button state
             fullScanBtn.textContent = originalText;
             fullScanBtn.disabled = false;
           }
