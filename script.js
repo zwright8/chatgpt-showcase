@@ -268,7 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
        *   zero or a negative value to scan all available symbols.
        */
       async function scanAndDisplayUndervalued(limit = 0) {
-        const tickers = await fetchNasdaqList(limit);
+        // Retrieve a list of symbols from the widest universe available.  If a
+        // Financial Modeling Prep API key is provided, we can pull a global list
+        // of all securities.  Otherwise we fall back to the U.S. NASDAQ list.
+        const tickers = await fetchGlobalTickerList(limit);
         const results = [];
         // Clear any previous results and hide the table initially
         resultsBody.innerHTML = '';
@@ -356,6 +359,43 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       /**
+       * Retrieve a list of ticker symbols from the broadest available universe.
+       * If the user supplies a Financial Modeling Prep (FMP) API key, this
+       * function will request the `stock/list` endpoint which includes tens of
+       * thousands of symbols across global markets.  When no FMP key is
+       * provided, it falls back to the NASDAQ screener list.  Because the
+       * global list is very large, you can cap the number of returned symbols
+       * via the `limit` parameter.  If `limit` is zero or negative, the full
+       * list is returned.
+       *
+       * @param {number} limit Maximum number of tickers to return
+       * @returns {Promise<string[]>}
+       */
+      async function fetchGlobalTickerList(limit = 0) {
+        // If an FMP API key is present and not the default demo key, fetch the
+        // comprehensive list of global symbols.  Otherwise use the NASDAQ list.
+        if (API_KEYS.fmp && API_KEYS.fmp.trim() && API_KEYS.fmp.trim().toLowerCase() !== 'demo') {
+          try {
+            const url = `https://financialmodelingprep.com/api/v3/stock/list?apikey=${API_KEYS.fmp}`;
+            const data = await fetchWithProxy(url);
+            // The FMP endpoint returns an array of objects with a `symbol` field.
+            const symbols = Array.isArray(data)
+              ? data.map(item => (item.symbol || '').trim()).filter(Boolean)
+              : [];
+            if (!limit || !isFinite(limit) || limit <= 0) {
+              return symbols;
+            }
+            return symbols.slice(0, limit);
+          } catch (err) {
+            console.warn('Unable to fetch FMP ticker list:', err);
+            // fall back to NASDAQ list below
+          }
+        }
+        // Fallback: use NASDAQ list for U.S. companies
+        return fetchNasdaqList(limit);
+      }
+
+      /**
        * Scan a broad universe of tickers and return only those that appear
        * undervalued relative to their estimated intrinsic value.  For each
        * symbol a fundamental lookup is performed via the existing lookupTicker
@@ -373,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
        * format
        */
       async function scanAllUndervalued(limit = 100) {
-        const tickers = await fetchNasdaqList(limit);
+        const tickers = await fetchGlobalTickerList(limit);
         const results = [];
         for (const symbol of tickers) {
           try {
@@ -453,9 +493,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // indicate progress.  We scan all available symbols when limit <= 0.
       if (fullScanBtn) {
         fullScanBtn.addEventListener('click', async () => {
-          // Use the user‑supplied API key if provided
+          // Use the user‑supplied API key if provided.  Assign it to both
+          // providers so that a single key can serve Alpha Vantage or FMP.
           if (apiKeyInput && apiKeyInput.value && apiKeyInput.value.trim()) {
-            API_KEYS.alpha = apiKeyInput.value.trim();
+            const key = apiKeyInput.value.trim();
+            API_KEYS.alpha = key;
+            API_KEYS.fmp = key;
           }
           const originalText = fullScanBtn.textContent;
           fullScanBtn.textContent = 'Scanning...';
