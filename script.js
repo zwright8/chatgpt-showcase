@@ -32,6 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsTable = document.getElementById('results');
   const resultsBody = document.getElementById('results-body');
 
+  // Reference to the optional API key input field. Users can supply their own
+  // Alpha Vantage API key here to unlock data for a broader set of tickers.
+  const apiKeyInput = document.getElementById('apikey-input');
+
   /*
    * API keys for data providers.  By default the Alpha Vantage key uses
    * the public demo key, which only returns meaningful data for MSFT and a
@@ -226,6 +230,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set up click handler for the scan button
   scanBtn.addEventListener('click', async () => {
+    // If the user provided an API key, override the default demo key for this
+    // session.  Trim whitespace to avoid accidental spaces breaking the request.
+    if (apiKeyInput && apiKeyInput.value && apiKeyInput.value.trim()) {
+      API_KEYS.alpha = apiKeyInput.value.trim();
+    }
     const rawInput = tickersInput.value;
     if (!rawInput || !rawInput.trim()) return;
     const symbols = rawInput.split(/[\,\s]+/).filter(Boolean);

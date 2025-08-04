@@ -155,8 +155,11 @@ section {
 .scanner-form {
     display: flex;
     justify-content: center;
+    /* Allow the ticker and API key inputs to wrap on small screens */
+    flex-wrap: wrap;
     margin-bottom: 1.5rem;
     gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .scanner-form input {
@@ -169,6 +172,7 @@ section {
     background: #171730;
     color: #e0e0f4;
     font-size: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 .results-table table {

@@ -67,6 +67,8 @@
         <p class="section-subtitle">Enter ticker symbols (comma‑separated) to fetch fundamental data from free providers and compute valuation metrics. Results are for educational purposes only and may be subject to API rate limits.</p>
         <div class="scanner-form">
             <input type="text" id="tickers-input" placeholder="e.g. AAPL, MSFT, TSLA" />
+            <!-- Optional API key input allows users to supply their own Alpha Vantage key -->
+            <input type="text" id="apikey-input" placeholder="Alpha Vantage API Key (optional)" />
             <button id="scan-btn" class="btn-primary">Scan</button>
         </div>
         <div id="results" class="results-table" style="display:none;">
