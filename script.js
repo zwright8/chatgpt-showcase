@@ -32,6 +32,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsTable = document.getElementById('results');
   const resultsBody = document.getElementById('results-body');
 
+      // Reference to the optional button that performs a broad market scan. When
+      // clicked this will fetch a large list of tickers from the NASDAQ
+      // screener API and compute valuation metrics for each. Companies
+      // trading below their intrinsic value (as calculated by a constant‑growth
+      // dividend discount model) are returned. Because this can require
+      // hundreds of API calls it is limited to a configurable number of
+      // tickers and may take several seconds to complete.
+      const fullScanBtn = document.getElementById('full-scan-btn');
+
   // Reference to the optional API key input field. Users can supply their own
   // Alpha Vantage API key here to unlock data for a broader set of tickers.
   const apiKeyInput = document.getElementById('apikey-input');
@@ -240,6 +249,108 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsTable.style.display = rows.length > 0 ? 'block' : 'none';
   }
 
+      /**
+       * Fetch a list of ticker symbols from the NASDAQ screener API. This
+       * endpoint returns approximately 7,000 actively traded U.S. companies
+       * along with price and market cap information.  We only need the
+       * symbol field for scanning.  If the request fails, an empty array is
+       * returned.
+       *
+       * @param {number} limit Maximum number of tickers to return. Limiting the
+       * number of symbols helps avoid exhausting rate limits on subsequent
+       * fundamental data requests.
+       * @returns {Promise<string[]>}
+       */
+      async function fetchNasdaqList(limit = 100) {
+        try {
+          // NASDAQ screener endpoint returns a JSON table of all US-listed stocks.
+          // We pass limit=0 here so that the API returns the full dataset on the
+          // server side; we handle slicing on the client.  If the API were to
+          // respect a limit parameter this would avoid downloading unnecessary
+          // data, but at the time of writing the parameter is ignored.
+          const url = 'https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=0';
+          const data = await fetchWithProxy(url);
+          const rows = data && data.data && data.data.table && Array.isArray(data.data.table.rows)
+            ? data.data.table.rows
+            : [];
+          // Extract the symbol property and trim whitespace
+          const symbols = rows.map(r => (r.symbol || '').trim()).filter(Boolean);
+          // When the caller passes limit <= 0 or a non‑finite value, return the
+          // entire list of symbols.  Otherwise slice to the requested count.
+          if (!limit || !isFinite(limit) || limit <= 0) {
+            return symbols;
+          }
+          return symbols.slice(0, limit);
+        } catch (err) {
+          console.warn('Unable to fetch NASDAQ ticker list:', err);
+          return [];
+        }
+      }
+
+      /**
+       * Scan a broad universe of tickers and return only those that appear
+       * undervalued relative to their estimated intrinsic value.  For each
+       * symbol a fundamental lookup is performed via the existing lookupTicker
+       * helper, metrics are computed, and then filtered by price < intrinsic
+       * value.  Results are sorted by the ratio price / intrinsicValue in
+       * ascending order so that the most undervalued stocks appear first.
+       *
+       * Note: Without a valid API key the Alpha Vantage demo key only
+       * provides data for a handful of symbols (IBM and MSFT).  To scan
+       * effectively you must supply your own key via the input field or
+       * modify the API_KEYS object.
+       *
+       * @param {number} limit Maximum number of tickers to scan
+       * @returns {Promise<Array>} Array of rows matching the renderResults
+       * format
+       */
+      async function scanAllUndervalued(limit = 100) {
+        const tickers = await fetchNasdaqList(limit);
+        const results = [];
+        for (const symbol of tickers) {
+          try {
+            const fundamental = await lookupTicker(symbol);
+            if (!fundamental) continue;
+            const price = typeof fundamental.price === 'number' && !isNaN(fundamental.price) ? fundamental.price : null;
+            const dividend = typeof fundamental.dividendPerShare === 'number' && !isNaN(fundamental.dividendPerShare) ? fundamental.dividendPerShare : null;
+            // Use the same 8% discount rate as computeMetrics to derive an intrinsic value
+            const discountRate = 0.08;
+            const intrinsicVal = dividend ? dividend / discountRate : null;
+            if (price != null && intrinsicVal != null && price < intrinsicVal) {
+              // Format the metrics using existing helper for display
+              const metrics = computeMetrics(fundamental);
+              results.push({
+                ticker: symbol.toUpperCase(),
+                ...metrics,
+                _priceNumeric: price,
+                _intrinsicNumeric: intrinsicVal
+              });
+            }
+          } catch (err) {
+            console.warn('Error scanning symbol', symbol, err);
+          }
+        }
+        // Sort by how undervalued the company is: price/intrinsic ascending
+        results.sort((a, b) => {
+          const ratioA = (a._priceNumeric && a._intrinsicNumeric) ? (a._priceNumeric / a._intrinsicNumeric) : Infinity;
+          const ratioB = (b._priceNumeric && b._intrinsicNumeric) ? (b._priceNumeric / b._intrinsicNumeric) : Infinity;
+          return ratioA - ratioB;
+        });
+        // Strip out the numeric helper fields before returning
+        return results.map(({ ticker, price, eps, pe, bookValue, pb, evEbitda, dividendPerShare, dividendYield, intrinsicDividend }) => ({
+          ticker,
+          price,
+          eps,
+          pe,
+          bookValue,
+          pb,
+          evEbitda,
+          dividendPerShare,
+          dividendYield,
+          intrinsicDividend
+        }));
+      }
+
   // Set up click handler for the scan button
   scanBtn.addEventListener('click', async () => {
     // If the user provided an API key, override the default demo key for this
@@ -266,6 +377,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     renderResults(rows);
   });
+
+      // Attach handler for the Full Market Scan button.  This triggers a
+      // comprehensive scan over a broad universe of tickers.  By default we
+      // scan every available NASDAQ ticker.  Depending on the size of the
+      // universe this may take several minutes and make many API requests, so
+      // users should supply their own API key to avoid rate limits.  The
+      // button is disabled while the scan runs, and its label changes to
+      // indicate progress.  Pass a limit <= 0 to scan the entire list.
+      if (fullScanBtn) {
+        fullScanBtn.addEventListener('click', async () => {
+          // Use the user‑supplied API key if provided
+          if (apiKeyInput && apiKeyInput.value && apiKeyInput.value.trim()) {
+            API_KEYS.alpha = apiKeyInput.value.trim();
+          }
+          // Update UI to indicate scanning is in progress
+          const originalText = fullScanBtn.textContent;
+          fullScanBtn.textContent = 'Scanning...';
+          fullScanBtn.disabled = true;
+          try {
+            // Pass limit <= 0 to scan all available symbols.  Note: this can
+            // generate thousands of requests and may exceed free API limits.
+            const rows = await scanAllUndervalued(0);
+            renderResults(rows);
+          } finally {
+            // Restore button state
+            fullScanBtn.textContent = originalText;
+            fullScanBtn.disabled = false;
+          }
+        });
+      }
 
   // Update the footer year dynamically
   const yearSpan = document.getElementById('year');
