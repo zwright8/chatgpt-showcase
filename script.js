@@ -1,82 +1,254 @@
-// Utility: wait for DOM ready
+/*
+ * Stock Screener Script
+ *
+ * This script powers the stock scanning portion of the website. Users can enter
+ * comma‑separated ticker symbols and the script will attempt to retrieve
+ * fundamental data from free public APIs. The primary source used is
+ * Alpha Vantage's “OVERVIEW” and “GLOBAL_QUOTE” endpoints, which expose
+ * earnings per share, book value per share, enterprise value, EBITDA, and
+ * dividend information. A simple proxy service (allorigins.win) is used to
+ * bypass cross‑origin restrictions when making requests from a browser.
+ *
+ * If data is successfully retrieved, the script computes several valuation
+ * metrics inspired by the CFA curriculum:
+ *   – Price/Earnings (P/E) ratio
+ *   – Price/Book (P/B) ratio
+ *   – EV/EBITDA ratio (a proxy for the enterprise value model)
+ *   – Dividend per share and dividend yield
+ *   – A constant‑growth dividend discount model (simplified Gordon Growth) to
+ *     estimate an intrinsic value using a default discount rate of 8% and
+ *     zero growth. This is purely illustrative and should not be relied on
+ *     for investment decisions.
+ *
+ * In order to use a different data provider or to customise the discount rate,
+ * modify the API_KEYS constant and the helper functions below. If no data
+ * provider responds or if a ticker is invalid, the row for that ticker will
+ * display N/A values.
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Chat functionality
-  const chatMessages = document.getElementById('chat-messages');
-  const userInput = document.getElementById('user-input');
-  const sendBtn = document.getElementById('send-btn');
+  const scanBtn = document.getElementById('scan-btn');
+  const tickersInput = document.getElementById('tickers-input');
+  const resultsTable = document.getElementById('results');
+  const resultsBody = document.getElementById('results-body');
+
+  /*
+   * API keys for data providers.  By default the Alpha Vantage key uses
+   * the public demo key, which only returns meaningful data for MSFT and a
+   * handful of symbols.  To enable scanning across all tickers you should
+   * sign up for a free API key at https://www.alphavantage.co/support/#api-key
+   * and replace the value below.  You may optionally add a Financial
+   * Modeling Prep key if you have one.
+   */
+  const API_KEYS = {
+    alpha: 'demo',
+    fmp: ''
+  };
 
   /**
-   * Determine a canned response based on user input.
-   * This function looks for simple keywords and returns a relevant reply.
-   * It serves purely for demonstration — a real ChatGPT integration would
-   * call the OpenAI API to generate dynamic answers.
-   * @param {string} input
-   * @returns {string}
+   * Fetch JSON over the network via a simple proxy to work around
+   * cross‑origin resource sharing (CORS) restrictions. The proxy forwards
+   * requests to the target URL and returns the raw response. See
+   * https://github.com/gnuns/allorigins for details.
+   *
+   * @param {string} url Fully qualified URL to fetch
+   * @returns {Promise<any>} Parsed JSON response
    */
-  function getResponse(input) {
-    const normalized = input.toLowerCase();
-    if (/\bhello\b|\bhi\b|\bhey\b/.test(normalized)) {
-      return "Hello! I'm ChatGPT — a sophisticated AI that can help you with a wide range of questions.";
+  async function fetchWithProxy(url) {
+    const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxied);
+    if (!response.ok) {
+      throw new Error(`Network error ${response.status}`);
     }
-    if (/\bhelp\b|\bassist\b/.test(normalized)) {
-      return "I can assist with writing, learning, coding, planning and more. What do you want to explore?";
-    }
-    if (/\bcode\b|\bprogram\b/.test(normalized)) {
-      return "Need help with code? I can generate snippets, explain algorithms, and debug errors.";
-    }
-    if (/\bstory\b|\bwrite\b|\bnarrative\b/.test(normalized)) {
-      return "Let me spin a tale! With a prompt, I can craft engaging stories or creative text.";
-    }
-    if (/\bplan\b|\bitinerary\b|\brecommend\b/.test(normalized)) {
-      return "From travel itineraries to meal plans, I can offer personalized recommendations tailored to your needs.";
-    }
-    return "That's an interesting thought! Imagine what we could do with a live API connection.";
+    return await response.json();
   }
 
   /**
-   * Append a message to the chat window.
-   * @param {string} text - The message text
-   * @param {string} sender - "user" or "bot"
+   * Attempt to retrieve fundamental data from the Financial Modeling Prep API.
+   * This function is optional and will only execute if a key is provided.
+   * It returns an object containing price, eps, bookValue, enterprise value,
+   * EBITDA and dividend information. When unavailable or errors occur it
+   * returns null.
+   *
+   * @param {string} symbol Stock ticker
+   * @returns {Promise<object|null>}
    */
-  function appendMessage(text, sender) {
-    const messageEl = document.createElement('div');
-    messageEl.classList.add('message', sender);
-    const bubble = document.createElement('div');
-    bubble.classList.add('text');
-    bubble.textContent = text;
-    messageEl.appendChild(bubble);
-    chatMessages.appendChild(messageEl);
-    // scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  async function fetchFromFMP(symbol) {
+    if (!API_KEYS.fmp) return null;
+    try {
+      // Quote endpoint: includes price, EPS and P/E ratio (if available)
+      const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${API_KEYS.fmp}`;
+      const quoteData = await fetchWithProxy(quoteUrl);
+      if (!Array.isArray(quoteData) || quoteData.length === 0) return null;
+      const quote = quoteData[0];
+      const price = parseFloat(quote.price);
+      // Key metrics endpoint: includes book value per share, enterprise value, EBITDA, etc.
+      const metricsUrl = `https://financialmodelingprep.com/api/v3/key-metrics/${symbol}?period=annual&limit=1&apikey=${API_KEYS.fmp}`;
+      const metricsData = await fetchWithProxy(metricsUrl);
+      const metrics = Array.isArray(metricsData) && metricsData.length > 0 ? metricsData[0] : {};
+      const eps = parseFloat(metrics.EarningsPerShareTTM || quote.eps || quote.epsTTM);
+      const bookValue = parseFloat(metrics.bookValuePerShare || metrics.bookValue);
+      const enterpriseValue = parseFloat(metrics.enterpriseValue || quote.enterpriseValue);
+      const ebitda = parseFloat(metrics.EBITDA || quote.ebitda);
+      const dividendPerShare = parseFloat(metrics.dividendPerShare || quote.lastDiv);
+      const dividendYield = parseFloat(metrics.dividendYield || quote.dividendYield);
+      return { price, eps, bookValue, enterpriseValue, ebitda, dividendPerShare, dividendYield };
+    } catch (err) {
+      console.warn('FMP error:', err);
+      return null;
+    }
   }
 
   /**
-   * Handle sending a user message.
+   * Retrieve fundamental data from Alpha Vantage's OVERVIEW and GLOBAL_QUOTE
+   * endpoints. Uses the provided API key. Returns null on failure or if
+   * required fields are missing.
+   *
+   * @param {string} symbol Stock ticker
+   * @returns {Promise<object|null>}
    */
-  function sendMessage() {
-    const input = userInput.value.trim();
-    if (!input) return;
-    appendMessage(input, 'user');
-    userInput.value = '';
-    // simulate latency
-    setTimeout(() => {
-      const reply = getResponse(input);
-      appendMessage(reply, 'bot');
-    }, 500);
+  async function fetchFromAlpha(symbol) {
+    if (!API_KEYS.alpha) return null;
+    try {
+      // Company overview (fundamentals)
+      const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${API_KEYS.alpha}`;
+      const overview = await fetchWithProxy(overviewUrl);
+      // If the API returns an empty object or contains error keys, abort
+      if (!overview || Object.keys(overview).length === 0 || overview.Note || overview['Error Message']) {
+        return null;
+      }
+      // Global quote (latest price)
+      const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEYS.alpha}`;
+      const quoteData = await fetchWithProxy(quoteUrl);
+      const quote = quoteData['Global Quote'];
+      if (!quote || !quote['05. price']) return null;
+      const price = parseFloat(quote['05. price']);
+      const eps = parseFloat(overview.EPS);
+      const bookValue = parseFloat(overview.BookValue);
+      const enterpriseValue = parseFloat(overview.EnterpriseValue);
+      const ebitda = parseFloat(overview.EBITDA);
+      const evToEbitda = parseFloat(overview.EVToEBITDA);
+      const dividendPerShare = parseFloat(overview.DividendPerShare);
+      const dividendYield = parseFloat(overview.DividendYield);
+      return { price, eps, bookValue, enterpriseValue, ebitda, evToEbitda, dividendPerShare, dividendYield };
+    } catch (err) {
+      console.warn('AlphaVantage error:', err);
+      return null;
+    }
   }
 
-  // Event listeners
-  sendBtn.addEventListener('click', sendMessage);
-  userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      sendMessage();
+  /**
+   * Lookup a ticker by querying multiple providers in sequence. Returns the
+   * first successful response. Providers used: FMP (if API key present),
+   * then Alpha Vantage. Additional providers could be added here.
+   *
+   * @param {string} symbol Stock ticker
+   * @returns {Promise<object|null>} Fundamental data or null
+   */
+  async function lookupTicker(symbol) {
+    const upper = symbol.toUpperCase();
+    let data = null;
+    if (API_KEYS.fmp) {
+      data = await fetchFromFMP(upper);
     }
+    if (!data && API_KEYS.alpha) {
+      data = await fetchFromAlpha(upper);
+    }
+    return data;
+  }
+
+  /**
+   * Compute valuation metrics given fundamental inputs. Handles missing values
+   * gracefully by returning 'N/A'. Also applies a simple constant‑growth
+   * dividend discount model with a zero growth assumption and an 8% discount
+   * rate to estimate intrinsic value. This formula is: intrinsic =
+   * dividendPerShare / discountRate.
+   *
+   * @param {object} data Fundamental data
+   * @returns {object} Formatted metrics
+   */
+  function computeMetrics(data) {
+    const price = typeof data.price === 'number' && !isNaN(data.price) ? data.price : null;
+    const eps = typeof data.eps === 'number' && !isNaN(data.eps) ? data.eps : null;
+    const bookValue = typeof data.bookValue === 'number' && !isNaN(data.bookValue) ? data.bookValue : null;
+    const enterpriseValue = typeof data.enterpriseValue === 'number' && !isNaN(data.enterpriseValue) ? data.enterpriseValue : null;
+    const ebitda = typeof data.ebitda === 'number' && !isNaN(data.ebitda) ? data.ebitda : null;
+    const evToEbitda = typeof data.evToEbitda === 'number' && !isNaN(data.evToEbitda) ? data.evToEbitda : (enterpriseValue && ebitda ? enterpriseValue / ebitda : null);
+    const dividendPerShare = typeof data.dividendPerShare === 'number' && !isNaN(data.dividendPerShare) ? data.dividendPerShare : null;
+    const dividendYield = typeof data.dividendYield === 'number' && !isNaN(data.dividendYield) ? data.dividendYield : (dividendPerShare && price ? dividendPerShare / price : null);
+
+    const pe = price && eps ? price / eps : null;
+    const pb = price && bookValue ? price / bookValue : null;
+    // Simplified dividend discount model: constant growth g=0, discount rate r=8%
+    const discountRate = 0.08;
+    const intrinsicDividend = dividendPerShare ? dividendPerShare / discountRate : null;
+
+    const format = (value, digits = 2) => (typeof value === 'number' && isFinite(value) ? value.toFixed(digits) : 'N/A');
+    return {
+      price: format(price),
+      eps: format(eps),
+      pe: format(pe),
+      bookValue: format(bookValue),
+      pb: format(pb),
+      evEbitda: format(evToEbitda),
+      dividendPerShare: format(dividendPerShare),
+      dividendYield: format(dividendYield, 4),
+      intrinsicDividend: format(intrinsicDividend)
+    };
+  }
+
+  /**
+   * Render the results table given an array of rows. Each row contains a
+   * ticker symbol and all computed metrics. The table is sorted by P/E ratio
+   * in ascending order; tickers with unavailable P/E will appear at the end.
+   *
+   * @param {Array} rows
+   */
+  function renderResults(rows) {
+    resultsBody.innerHTML = '';
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.ticker}</td>
+        <td>${row.price}</td>
+        <td>${row.eps}</td>
+        <td>${row.pe}</td>
+        <td>${row.bookValue}</td>
+        <td>${row.pb}</td>
+        <td>${row.evEbitda}</td>
+        <td>${row.dividendPerShare}</td>
+        <td>${row.dividendYield}</td>
+        <td>${row.intrinsicDividend}</td>`;
+      resultsBody.appendChild(tr);
+    });
+    resultsTable.style.display = rows.length > 0 ? 'block' : 'none';
+  }
+
+  // Set up click handler for the scan button
+  scanBtn.addEventListener('click', async () => {
+    const rawInput = tickersInput.value;
+    if (!rawInput || !rawInput.trim()) return;
+    const symbols = rawInput.split(/[\,\s]+/).filter(Boolean);
+    const rows = [];
+    for (const ticker of symbols) {
+      const fundamental = await lookupTicker(ticker);
+      if (fundamental) {
+        const metrics = computeMetrics(fundamental);
+        rows.push({ ticker: ticker.toUpperCase(), ...metrics });
+      }
+    }
+    // Sort by P/E ratio ascending; 'N/A' values (rendered as strings) push to the end
+    rows.sort((a, b) => {
+      const peA = a.pe === 'N/A' ? Infinity : parseFloat(a.pe);
+      const peB = b.pe === 'N/A' ? Infinity : parseFloat(b.pe);
+      return peA - peB;
+    });
+    renderResults(rows);
   });
 
-  // Footer year
+  // Update the footer year dynamically
   const yearSpan = document.getElementById('year');
   if (yearSpan) {
-    yearSpan.textContent = new Date().getFullYear();
+    yearSpan.textContent = new Date().getFullYear().toString();
   }
 });

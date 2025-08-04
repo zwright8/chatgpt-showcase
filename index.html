@@ -17,82 +17,84 @@
     <section class="hero">
         <div class="overlay"></div>
         <div class="content">
-            <h1>Discover the Power of ChatGPT</h1>
-            <p>Experience cutting‑edge AI that understands and creates like never before.</p>
-            <a href="#features" class="btn-primary">Explore Features</a>
+            <h1>Discover Undervalued Stocks</h1>
+            <p>Scan public markets using valuation models inspired by the CFA curriculum.</p>
+            <a href="#models" class="btn-primary">Learn the Models</a>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section id="features" class="features">
-        <h2>Capabilities That Inspire</h2>
-        <p class="section-subtitle">ChatGPT unlocks new possibilities across a wide range of tasks.</p>
+    <!-- Models Section -->
+    <section id="models" class="features">
+        <h2>Core Valuation Models</h2>
+        <p class="section-subtitle">Common frameworks used by analysts and CFA charterholders.</p>
         <div class="cards">
             <div class="card">
-                <div class="icon"><i class="fa-solid fa-language"></i></div>
-                <h3>Natural Language Understanding</h3>
-                <p>Comprehend and respond to complex questions with contextual awareness and nuance.</p>
+                <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+                <h3>Price‑Earnings (P/E)</h3>
+                <p>Compares share price to earnings per share to gauge relative value. Lower P/E may suggest undervaluation.</p>
             </div>
             <div class="card">
-                <div class="icon"><i class="fa-solid fa-pen-nib"></i></div>
-                <h3>Creative Text Generation</h3>
-                <p>Write stories, articles, and marketing copy with fluency and a human‑like touch.</p>
+                <div class="icon"><i class="fa-solid fa-book"></i></div>
+                <h3>Price‑to‑Book (P/B)</h3>
+                <p>Measures share price against book value per share. A P/B below 1 can indicate a bargain relative to assets.</p>
             </div>
             <div class="card">
-                <div class="icon"><i class="fa-solid fa-code"></i></div>
-                <h3>Programming Assistance</h3>
-                <p>Generate code, debug problems, and explain concepts in multiple languages.</p>
+                <div class="icon"><i class="fa-solid fa-divide"></i></div>
+                <h3>Dividend Discount</h3>
+                <p>Estimates intrinsic value by discounting expected dividends back to the present.</p>
             </div>
             <div class="card">
-                <div class="icon"><i class="fa-solid fa-graduation-cap"></i></div>
-                <h3>Learning & Education</h3>
-                <p>Teach complex topics, provide examples, and guide learners at all levels.</p>
+                <div class="icon"><i class="fa-solid fa-coins"></i></div>
+                <h3>Discounted Cash Flow</h3>
+                <p>Values a company based on the present value of projected free cash flows.</p>
             </div>
             <div class="card">
-                <div class="icon"><i class="fa-solid fa-route"></i></div>
-                <h3>Planning & Recommendations</h3>
-                <p>Create personalized itineraries, meal plans, and suggestions based on your needs.</p>
+                <div class="icon"><i class="fa-solid fa-percentage"></i></div>
+                <h3>EV/EBITDA</h3>
+                <p>Compares enterprise value to earnings before interest, taxes, depreciation and amortization.</p>
             </div>
             <div class="card">
-                <div class="icon"><i class="fa-solid fa-images"></i></div>
-                <h3>Multimodal & Visual</h3>
-                <p>Interpret images, describe visuals, and generate detailed alt‑text.</p>
+                <div class="icon"><i class="fa-solid fa-weight-scale"></i></div>
+                <h3>Residual Income</h3>
+                <p>Assesses value by adding book value to the present value of forecasted excess earnings.</p>
             </div>
         </div>
     </section>
 
-    <!-- Demo Section -->
-    <section id="demo" class="demo">
-        <h2>Interactive Demo</h2>
-        <p class="section-subtitle">Type a message to see how ChatGPT could respond.</p>
-        <div id="chat-container" class="chat-container">
-            <div id="chat-messages" class="chat-messages">
-                <!-- Messages will appear here dynamically -->
-            </div>
-            <div class="chat-input-area">
-                <input type="text" id="user-input" placeholder="Ask me anything..." />
-                <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-            </div>
+    <!-- Scanner Section -->
+    <section id="scanner" class="demo">
+        <h2>Stock Screener</h2>
+        <p class="section-subtitle">Enter ticker symbols (comma‑separated) to fetch fundamental data from free providers and compute valuation metrics. Results are for educational purposes only and may be subject to API rate limits.</p>
+        <div class="scanner-form">
+            <input type="text" id="tickers-input" placeholder="e.g. AAPL, MSFT, TSLA" />
+            <button id="scan-btn" class="btn-primary">Scan</button>
         </div>
-        <p class="demo-note">This demo uses canned responses to illustrate a conversation. To try the real thing, connect with the OpenAI API.</p>
+        <div id="results" class="results-table" style="display:none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Price</th>
+                        <th>EPS</th>
+                        <th>P/E</th>
+                        <th>Book Value</th>
+                        <th>P/B</th>
+                        <th>EV/EBITDA</th>
+                        <th>Dividend</th>
+                        <th>Div. Yield</th>
+                        <th>Intrinsic Value*</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body"></tbody>
+            </table>
+        </div>
+        <p class="demo-note">This tool uses free endpoints from providers like Alpha Vantage; some metrics may be unavailable or outdated. For best results supply your own API keys in <code>script.js</code>. <br /><em>*Intrinsic Value uses a simplified dividend discount model with a constant 8% discount rate and zero growth.</em></p>
     </section>
 
-    <!-- Contact Section -->
-    <section id="contact" class="contact">
-        <h2>Contact Us</h2>
-        <p class="section-subtitle">Get in touch to integrate ChatGPT into your workflow.</p>
-        <form class="contact-form" onsubmit="event.preventDefault(); alert('Thank you! We will be in touch.');">
-            <div class="form-group">
-                <input type="text" placeholder="Your Name" required>
-            </div>
-            <div class="form-group">
-                <input type="email" placeholder="Your Email" required>
-            </div>
-            <div class="form-group">
-                <textarea rows="4" placeholder="Your Message" required></textarea>
-            </div>
-            <button type="submit" class="btn-primary">Send Message</button>
-        </form>
+    <!-- Disclaimer Section -->
+    <section class="contact">
+        <h2>Disclaimer</h2>
+        <p class="section-subtitle">This website is for educational purposes only and does not constitute financial advice. Always conduct your own research or consult a qualified professional before making investment decisions.</p>
     </section>
 
     <!-- Footer -->
