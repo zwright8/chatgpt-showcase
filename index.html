@@ -70,6 +70,13 @@
             <!-- Optional API key input allows users to supply their own Alpha Vantage key -->
             <input type="text" id="apikey-input" placeholder="Alpha Vantage API Key (optional)" />
             <button id="scan-btn" class="btn-primary">Scan</button>
+            <!-- Button to perform a broader market scan.  When clicked this
+                 triggers a script that iterates over a large universe of
+                 publicly traded tickers and returns those trading below
+                 their computed intrinsic value.  Because it makes many
+                 network requests it may take time and uses a sensible
+                 default limit. -->
+            <button id="full-scan-btn" class="btn-primary">Full Market Scan</button>
         </div>
         <div id="results" class="results-table" style="display:none;">
             <table>
