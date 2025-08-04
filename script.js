@@ -59,12 +59,24 @@ document.addEventListener('DOMContentLoaded', () => {
    * @returns {Promise<any>} Parsed JSON response
    */
   async function fetchWithProxy(url) {
-    const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    /*
+     * Proxy requests through a serverless API route hosted on the same domain.
+     * This avoids CORS issues by ensuring all requests originate from our
+     * domain. The API endpoint simply fetches the target URL and returns
+     * the raw response. See `/api/proxy.js` in the repository for details.
+     */
+    const proxied = `/api/proxy?url=${encodeURIComponent(url)}`;
     const response = await fetch(proxied);
     if (!response.ok) {
       throw new Error(`Network error ${response.status}`);
     }
-    return await response.json();
+    // Try to parse JSON; fall back to text if parsing fails
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return text;
+    }
   }
 
   /**
